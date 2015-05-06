@@ -1,225 +1,116 @@
-
 #include "Arduino.h"
 #include <PrologueDecoder.h>
 
+const char SYNC_KEY[] = {1,0,0,1,1,0,0,1};
+const int TWOPOWERS[] = {1,2,4,8,16,32,64,128,256,512,1024};
 
+enum {IDLE,SYNCING,SYNCED};
 
-TempDecoder::TempDecoder(){
-	pReset();
+byte nibbleToHex(byte * nibble){
+	return (nibble[0]*8 + nibble[1]*4 + nibble[2]*2 + nibble[3]*1);
 }
 
 
-
-byte TempDecoder::nibbleToHex(byte * nibble, bool reverse){
-	if (reverse){
-		return (nibble[0]*1 + nibble[1]*2 + nibble[2]*4 + nibble[3]*8);
-	} else {
-		return (nibble[0]*8 + nibble[1]*4 + nibble[2]*2 + nibble[3]*1);
-	}
-
+PrologueDecoder::PrologueDecoder(){
+	reset();
+	detected = false;
 }
 
+void PrologueDecoder::pulse(word width, bool high){
 
-bool TempDecoder::interpretPrologue(){
-
-
-	byte hex[9];
-	for (int i = 0; i<36; i += 4){
-		hex[i/4] = nibbleToHex(pBits+i, false);
-	}
-
-
-
-	sensorID = hex[0];
-	sensorRollingCode = hex[1]*16 + hex[2];
-	sensorChannel = (pBits[14]*2 + pBits[15]) + 1;
-
-	// temp, stored as 12 bit signed something
-	float tempSign = (pBits[16]*2 + 1.0);
-	sensorTemp = 0.0;
-	for (int i = 0; i < 11; i++){
-		sensorTemp += pBits[17+i]* TWOPOWERS[10 - i]/10.0;
-	}
-	sensorTemp *= tempSign;
-
-	Serial.print("TEMP: "); Serial.println(sensorTemp);
-
-
-
-	return true; 
-}
-
-bool TempDecoder::decodePrologueSensor(word width, byte high){
-
-	switch (prologueState){
+	switch (state){
 	
-	case PROLOGUE_IDLE:
+	case IDLE:
 		{
 			if (high && ( (width > 330) && (width < 530))){
 				// Might be the start of a sync bit
-				prologueState = PROLOGUE_SYNCING;
-				return false;
-			} else {
-				return false;
+				state = SYNCING;
 			}
 		}
-	case PROLOGUE_SYNCING:
+	case SYNCING:
 		{
 			if (!high && ( (width > 7500) && (width < 10000))){
-				prologueState = PROLOGUE_SYNCED;
-				Serial.println("SYNCED");
-				return false;
+				state = SYNCED;
 			} else {
-				pReset();
-				return false;
+				reset();
 			}
 		}
-	case PROLOGUE_SYNCED:
+	case SYNCED:
 		{
-			// Receiving stuff
-			if ( high && !(pHalftime%2) ){
+			if ( high && !(halftime%2) ){
 				// High part of bit
 				if  ( (width < 330) || (width > 530) ){
-					pReset();
-					return false;
+					reset();
 				}
 
-			} else if ( !high && (pHalftime%2) ){
+			} else if ( !high && (halftime%2) ){
 				// Low part of bit
 				if ( (width > 1500) && (width < 2500)){
 					// Short low: "0"
-					pBits[pBitN] = 0;
-					pBitN++;
+					bits[bitN++] = 0;
 				} else if ( (width > 3500) && (width < 4500)){
 					// Long low: "1"
-					pBits[pBitN] = 1;
-					pBitN++;
+					bits[bitN++] = 1;
+				}else{
+					/* Don't worry about it... */
 				}
+
 			} else {
-				// Error
-				pReset();
-				return false;
+				reset();
 			}
 
-			// Done yet?
-			if ((pBitN == 36) && interpretPrologue()){
-				return true;
+			if (bitN == 36){
+				detected = true;
+				decode();
+				reset();
 			}
 
-			pHalftime++;
+			halftime++;
+
 		break;
+
 		}
 	}
-	return false;
-
 }
 
-void TempDecoder::pReset(){
-	prologueState = PROLOGUE_IDLE;
-	pBitN = 0;
-	pHalftime = 0;
-	for (int i = 0; i < 36; i++){
-		pBits[i] = -1;
-	}
-}
-
-bool TempDecoder::pulse(word width, byte high){
-	// Called when a transition has happend. "high" is the previous state, and width is the time in us of the length of that state
-	//Serial.print("width: ");Serial.print(width);Serial.print("  ");
-
-	// Prologue
-	if (decodePrologueSensor(width,high)){
-		// The prologue decoder has successfully decoded a message..
+bool PrologueDecoder::hasDetected(){
+	if (detected){
+		detected = false;
 		return true;
 	}
-
 	return false;
 }
-	/*
-	// Determine if this is a long or short pulse
-	switch (high){
-	case 1:
-		pulseType = wasHighFor(width);
-		break;
-	case 0:
-		pulseType = wasLowFor(width);
-		break;
-	}
 
-
-	// Increment the half time clock
-	switch (pulseType){
-	case 0:
-		// Short pulse
-		halftime += 1;
-		break;
-	case 1:
-		// Long pulse
-		halftime += 2;
-		if (halftime%2){
-			// clock boundary. Should not happen, as no change could have happend in the middle of this clock period.
-			reset();
-			return false;
-		}
-
-		break;
-	default:
-		reset();
-		return false;
-		break;
-	}
-
-	//Serial.print("C:");Serial.print(halftime);Serial.print(" ");
-
-	// If we are in the middle of a clock period
-	if (halftime%2 == 0){
-		return gotBit(high);
-	}
-	return false;
-
-	
+Data PrologueDecoder::getData(){
+	return data;
 }
 
-int TempDecoder::wasHighFor(word width){
+void PrologueDecoder::decode(){
 
-	if ((width >= 200) && (width < 615)){
-		// Short
-		return 0;
-	} else if ((width >= 615) && (width < 1100)){
-		// Long
-		return 1;
-	} else {
-		//Error
-		return -1;
+	byte hex[9];
+	for (int i = 0; i<36; i += 4){
+		hex[i/4] = nibbleToHex(bits+i);
 	}
-	
+
+	float sign = (bits[16]*(-2) + 1.0);
+	float temp = 0.0;
+	for (int i = 0; i < 11; i++){
+		temp += bits[17+i]* TWOPOWERS[10 - i];
+	}
+	temp = sign*temp/10.0;
+
+	data.ID = hex[0];
+	data.rollingCode = hex[1]*16 + hex[2];
+	data.channel = (bits[14]*2 + bits[15]) + 1;
+	data.temp = temp;
 }
 
-int TempDecoder::wasLowFor(word width){
 
-	if ((width >= 400) && (width < 850)){
-		// Short
-		return 0;
-	} else if ((width >= 850) && (width < 1400)){
-		// Long
-		return 1;
-	} else {
-		//Error
-		return -1;
-	}
-	
-}
-
-void TempDecoder::reset(){
-	// Reset
+void PrologueDecoder::reset(){
 	state = IDLE;
-	syncOnes = 0;
 	bitN = 0;
 	halftime = 0;
-
-	for (int i = 0; i < 64; i++){
-		rawBits[i] = -1;
+	for (int i = 0; i < 36; i++){
+		bits[i] = -1;
 	}
-
 }
-	*/
