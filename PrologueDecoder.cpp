@@ -1,11 +1,10 @@
 
 #include "Arduino.h"
-#include <TempDecoder.h>
+#include <PrologueDecoder.h>
 
 
 
 TempDecoder::TempDecoder(){
-	reset();
 	pReset();
 }
 
@@ -20,85 +19,7 @@ byte TempDecoder::nibbleToHex(byte * nibble, bool reverse){
 
 }
 
-bool TempDecoder::interpretData(){
-	byte hex[16];
-	for (int i = 0; i<64; i += 4){
-		hex[i/4] = nibbleToHex(bits+i,true);
-	}
-	
-	sensorID = hex[0]*4096 + hex[1]*256 + hex[2]*16 + hex[3];
-	sensorChannel = hex[4];
-	sensorRollingCode = hex[5]*2 + hex[6];
-	sensorFlag = hex[7];
-	sensorTemp = (hex[10]*10.0 + hex[9]*1.0 + hex[8]*0.1);
-	if (hex[11]){sensorTemp *= -1;}
-	
-}
 
-bool TempDecoder::gotBit(byte bit){
-
-	switch (state){
-		
-		case IDLE:
-			if (bit && (halftime == 2)){
-				// This is what's left of the first sync 1, encoded as 01
-				syncOnes = 1;
-				state = ONES;
-			}
-			break;
-		case ONES:
-			{
-			bool odd = (halftime/2) % 2;
-			if (   (bit && odd)  || (!bit && !odd) ) {
-				syncOnes++;
-			} else if ((syncOnes >= 30) && bit) {
-				// We have synced.. maybe
-
-				bitN++;
-				state = SYNCING;
-			} else {
-				reset();
-			}
-			break;
-			}
-		case SYNCING:
-			{
-			if (bit != SYNC_KEY[bitN]){
-				reset();
-				return false;
-			}
-			bitN++;
-
-			if (bitN == 8){
-				state = RECV;
-				bitN = 0;
-			}
-
-			break;
-			}
-		case RECV:
-			{
-			rawBits[bitN] = bit;
-			bitN++;
-			if (bitN == 128){
-
-				// Convert to actual bits
-				for (int i = 0; i < 64; i++){
-					bits[i] = rawBits[2*i + 1];
-
-				}
-
-				interpretData();
-				reset();
-				return true;
-			}
-			
-			break;
-			}
-	
-	}
-	return false;
-}
 bool TempDecoder::interpretPrologue(){
 
 
@@ -120,6 +41,8 @@ bool TempDecoder::interpretPrologue(){
 		sensorTemp += pBits[17+i]* TWOPOWERS[10 - i]/10.0;
 	}
 	sensorTemp *= tempSign;
+
+	Serial.print("TEMP: "); Serial.println(sensorTemp);
 
 
 
@@ -144,6 +67,7 @@ bool TempDecoder::decodePrologueSensor(word width, byte high){
 		{
 			if (!high && ( (width > 7500) && (width < 10000))){
 				prologueState = PROLOGUE_SYNCED;
+				Serial.println("SYNCED");
 				return false;
 			} else {
 				pReset();
@@ -209,6 +133,9 @@ bool TempDecoder::pulse(word width, byte high){
 		return true;
 	}
 
+	return false;
+}
+	/*
 	// Determine if this is a long or short pulse
 	switch (high){
 	case 1:
@@ -295,3 +222,4 @@ void TempDecoder::reset(){
 	}
 
 }
+	*/

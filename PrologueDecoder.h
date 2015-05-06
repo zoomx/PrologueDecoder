@@ -24,18 +24,6 @@ public:
 
 private:
 	
-	// Oregon
-	int wasHighFor(word width);
-	int wasLowFor(word width);
-	bool gotBit(byte bit);
-	void reset();
-	enum {IDLE, ONES,SYNCING, RECV, DONE};
-	byte state, syncOnes, bitN,pulseType;
-	byte rawBits[128];
-	byte bits[64];
-	int halftime;
-	bool interpretData();
-
 	// Prologue
 	bool decodePrologueSensor(word width, byte high);
 	byte prologueState;
