@@ -31,26 +31,22 @@ void PrologueDecoder::pulse(word width, bool high){
 		}
 	case SYNCED:
 		{
-			if ( high && !(halftime%2) ){
-				// High part of bit
-				if  ( (width < 330) || (width > 530) ){
+			if (high){
+
+				if  ((width < 330) || (width > 530)){
 					reset();
 				}
 
-			} else if ( !high && (halftime%2) ){
-				// Low part of bit
-				if ( (width > 1500) && (width < 2500)){
-					// Short low: "0"
+			} else {
+				
+				if ((width > 1500) && (width < 2500)){
 					bits[bitN++] = 0;
-				} else if ( (width > 3500) && (width < 4500)){
-					// Long low: "1"
+				} else if ((width > 3500) && (width < 4500)){
 					bits[bitN++] = 1;
 				}else{
 					/* Don't worry about it... */
 				}
 
-			} else {
-				reset();
 			}
 
 			if (bitN == 36){
@@ -58,8 +54,6 @@ void PrologueDecoder::pulse(word width, bool high){
 				decode();
 				reset();
 			}
-
-			halftime++;
 
 		break;
 
