@@ -28,7 +28,6 @@ private:
 	byte state;
 	byte bits[36];
 	byte bitN;
-	int halftime;
 };
 
 

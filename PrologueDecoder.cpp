@@ -99,7 +99,6 @@ void PrologueDecoder::decode(){
 void PrologueDecoder::reset(){
 	state = IDLE;
 	bitN = 0;
-	halftime = 0;
 	for (int i = 0; i < 36; i++){
 		bits[i] = -1;
 	}
