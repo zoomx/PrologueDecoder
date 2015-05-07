@@ -2,14 +2,8 @@
 #include <PrologueDecoder.h>
 
 const char SYNC_KEY[] = {1,0,0,1,1,0,0,1};
-const int TWOPOWERS[] = {1,2,4,8,16,32,64,128,256,512,1024};
 
 enum {IDLE,SYNCING,SYNCED};
-
-byte nibbleToHex(byte * nibble){
-	return (nibble[0]*8 + nibble[1]*4 + nibble[2]*2 + nibble[3]*1);
-}
-
 
 PrologueDecoder::PrologueDecoder(){
 	reset();
@@ -85,24 +79,21 @@ Data PrologueDecoder::getData(){
 	return data;
 }
 
+unsigned long binaryNumber(byte b[], int size){
+	unsigned long num = 0;
+	for (int i = 0; i < size; i++){
+		num = 2*num + b[i];
+	}
+
+	return num;
+}
+
 void PrologueDecoder::decode(){
 
-	byte hex[9];
-	for (int i = 0; i<36; i += 4){
-		hex[i/4] = nibbleToHex(bits+i);
-	}
-
-	float sign = (bits[16]*(-2) + 1.0);
-	float temp = 0.0;
-	for (int i = 0; i < 11; i++){
-		temp += bits[17+i]* TWOPOWERS[10 - i];
-	}
-	temp = sign*temp/10.0;
-
-	data.ID = hex[0];
-	data.rollingCode = hex[1]*16 + hex[2];
-	data.channel = (bits[14]*2 + bits[15]) + 1;
-	data.temp = temp;
+	data.ID = binaryNumber(bits, 4);
+	data.rollingCode = binaryNumber(bits+4, 8);
+	data.channel = binaryNumber(bits+14, 2);
+	data.temp = (bits[16]*(-2)+1.0)*binaryNumber(bits+17, 11)/10.0;
 }
 
 
