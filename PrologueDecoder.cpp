@@ -17,17 +17,21 @@ void PrologueDecoder::pulse(word width, bool high){
 	case IDLE:
 		{
 			if (high && ( (width > 330) && (width < 530))){
-				// Might be the start of a sync bit
 				state = SYNCING;
 			}
+
+			break;
 		}
 	case SYNCING:
 		{
 			if (!high && ( (width > 7500) && (width < 10000))){
 				state = SYNCED;
+
 			} else {
 				reset();
 			}
+
+			break;
 		}
 	case SYNCED:
 		{
@@ -41,10 +45,12 @@ void PrologueDecoder::pulse(word width, bool high){
 				
 				if ((width > 1500) && (width < 2500)){
 					bits[bitN++] = 0;
+
 				} else if ((width > 3500) && (width < 4500)){
 					bits[bitN++] = 1;
+
 				}else{
-					/* Don't worry about it... */
+					reset();
 				}
 
 			}
@@ -55,8 +61,7 @@ void PrologueDecoder::pulse(word width, bool high){
 				reset();
 			}
 
-		break;
-
+			break;
 		}
 	}
 }
