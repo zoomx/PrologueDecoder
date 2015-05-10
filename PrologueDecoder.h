@@ -3,7 +3,6 @@
 
 #include "Arduino.h"
 
-
 typedef struct {
 	byte ID : 4;
 	byte rollingID : 8;
