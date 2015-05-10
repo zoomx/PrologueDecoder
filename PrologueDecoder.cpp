@@ -78,8 +78,8 @@ PrologueData PrologueDecoder::getData(){
 void PrologueDecoder::decodeRawData(){
 	data.ID = (rawData[0]&0xF0) >> 4;
 	data.rollingID = ((rawData[0]&0x0F) << 4) | ((rawData[1]&0xF0) >> 4);
-	data.battery = rawData[1]&0x08 ? 1 : 0;
-	data.button= rawData[1]&0x04 ? 1 : 0;
+	data.battery = rawData[1]&0x08;
+	data.button= rawData[1]&0x04;
 	data.channel = (rawData[1]&0x03) + 1;
 	data.temp = (((int16_t)(((uint16_t)rawData[2] << 8) | (rawData[3]&0xF0)))/16)*0.1;
 	
