@@ -6,7 +6,7 @@ RF_Switch rfSwitch(2);
 
 int pw;
 bool high;
-Data data;
+PrologueData data;
 
 void setup(){
 	pinMode(2,INPUT);
@@ -15,14 +15,15 @@ void setup(){
 }
 
 void loop(){
-
 	if ((pw = rfSwitch.pulse(&high))){
-		decoder.pulse(pw, high);
-	}
-
-	if (decoder.hasDetected()){
-		data = decoder.getData();
-		Serial.println(data.temp);
+		if (decoder.pulse(pw, high)){
+			data = decoder.getData();
+			Serial.println(data.temp);
+			Serial.println(data.ID);
+			Serial.println(data.rollingID);
+			Serial.println(data.battery);
+			Serial.println(data.button);
+		}
 	}
 
 }

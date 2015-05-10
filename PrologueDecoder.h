@@ -5,29 +5,27 @@
 
 
 typedef struct {
-	word ID;
-	byte channel;
-	byte rollingCode;
-	byte flag;
+	byte ID : 4;
+	byte rollingID : 8;
+	bool battery : 1;
+	bool button : 1;
+	byte channel : 2;
 	float temp;
-} Data;
+} PrologueData;
 
 class PrologueDecoder {
 
 public:
 	PrologueDecoder();
-	void pulse(word width, bool high);
-	bool hasDetected();
-	Data getData();
+	bool pulse(word width, bool high);
+	PrologueData getData();
 
 private:
-	Data data;
-	void decode();
+	void decodeRawData();
 	void reset();
-	bool detected;
 	byte state;
-	byte bits[36];
-	byte bitN;
+	byte rawData[5], i;
+	PrologueData data;
 };
 
 
