@@ -11,84 +11,86 @@
 		C - channel
 		T - Temp
 		H - Humidity
+
+    Added humidity decoding that was left out by c-math
 */
 
-#include "Arduino.h"
-#include <PrologueDecoder.h>
+#include <Arduino.h>
+#include "PrologueDecoder.h"
 
 #define PROTOCOL_SIZE 36
 #define setBit(byteArray,index) ((byteArray)[(index)/8] |= (1 << (7 - (index)%8)))
 
-enum {IDLE,SYNCED};
-const char SYNC_KEY[] = {1,0,0,1,1,0,0,1};
+enum {IDLE, SYNCED};
+const char SYNC_KEY[] = {1, 0, 0, 1, 1, 0, 0, 1};
 
-PrologueDecoder::PrologueDecoder(){
-	reset();
+PrologueDecoder::PrologueDecoder() {
+  reset();
 }
 
-bool PrologueDecoder::pulse(word width, bool high){
+bool PrologueDecoder::pulse(word width, bool high) {
 
-	if (high){
-		if (width < 330 && width > 530){
-			state = IDLE;
-		}
-		return false;
-	}
+  if (high) {
+    if (width < 330 && width > 530) {
+      state = IDLE;
+    }
+    return false;
+  }
 
-	switch (state){
-	
-	case IDLE:
+  switch (state) {
 
-		if (width > 7500 && width < 10000){
-			reset();
-			state = SYNCED;
-		}
-		break;
+    case IDLE:
 
-	case SYNCED:
+      if (width > 7500 && width < 10000) {
+        reset();
+        state = SYNCED;
+      }
+      break;
 
-		// Zero bit
-		if (width > 1500 && width < 2500){
-			i++;
-		}
-		// One bit
-		else if (width > 3500 && width < 4500){
-			setBit(rawData,i);
-			i++;
-		}
-		// Corrupt
-		else{
-			state = IDLE;
-		}
+    case SYNCED:
 
-		if (i == PROTOCOL_SIZE){
-			decodeRawData();
+      // Zero bit
+      if (width > 1500 && width < 2500) {
+        i++;
+      }
+      // One bit
+      else if (width > 3500 && width < 4500) {
+        setBit(rawData, i);
+        i++;
+      }
+      // Corrupt
+      else {
+        state = IDLE;
+      }
 
-			return true;
-		}
-		break;
-	}
+      if (i == PROTOCOL_SIZE) {
+        decodeRawData();
 
-	return false;
+        return true;
+      }
+      break;
+  }
+
+  return false;
 }
 
-PrologueData PrologueDecoder::getData(){
-	return data;
+PrologueData PrologueDecoder::getData() {
+  return data;
 }
 
-void PrologueDecoder::decodeRawData(){
-	data.ID = (rawData[0]&0xF0) >> 4;
-	data.rollingID = ((rawData[0]&0x0F) << 4) | ((rawData[1]&0xF0) >> 4);
-	data.battery = (rawData[1]&0x08);
-	data.button = (rawData[1]&0x04);
-	data.channel = (rawData[1]&0x03) + 1;
-	data.temp = (((int16_t)(((uint16_t)rawData[2] << 8) | (rawData[3]&0xF0)))/16)*0.1;
-	
+void PrologueDecoder::decodeRawData() {
+  data.ID = (rawData[0] & 0xF0) >> 4;
+  data.rollingID = ((rawData[0] & 0x0F) << 4) | ((rawData[1] & 0xF0) >> 4);
+  data.battery = (rawData[1] & 0x08);
+  data.button = (rawData[1] & 0x04);
+  data.channel = (rawData[1] & 0x03) + 1;
+  data.temp = (((int16_t)(((uint16_t)rawData[2] << 8) | (rawData[3] & 0xF0))) / 16) * 0.1;
+  data.humidity = (rawData[3] << 4) | (rawData[4] / 16 );
 }
 
 
-void PrologueDecoder::reset(){
-	memset(rawData, 0, sizeof(rawData));
-	state = IDLE;
-	i = 0;
+void PrologueDecoder::reset() {
+  memset(rawData, 0, sizeof(rawData));
+  state = IDLE;
+  i = 0;
 }
